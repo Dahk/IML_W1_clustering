@@ -73,21 +73,20 @@ def load_credita():
     y_label_encoder = LabelEncoder()
     y = y_label_encoder.fit_transform(y)
 
-    # Fill missing numerical values
+    # fill missing numerical values
     X.fillna(X.mean(), inplace=True)
 
-    # Fill missing categorical values
+    # fill missing categorical values
     categ_cols = X.select_dtypes(include=['category', object]).columns
     for col in categ_cols:
         X[col].replace(b'?', X[col].mode()[0], inplace=True)
-    # X[categ_cols] = X[categ_cols].apply(lambda col: col.replace(b'?', col.mode()[0]))
 
-    # Standarize numerical features
+    # standarize numerical features
     num_cols = X.select_dtypes(include=['number']).columns
-    scaler = MinMaxScaler()
-    X[num_cols] = scaler.fit_transform(X[num_cols])
+    mm_scaler = MinMaxScaler()
+    X[num_cols] = mm_scaler.fit_transform(X[num_cols])
 
-    # Use one transformer per feature to preserve its name in the generated features
+    # use one transformer per feature to preserve its name in the generated features
     # since new feature names are based on the transformer's name
     transformers = [(col, OneHotEncoder(drop='first'), [col]) for col in categ_cols]
     col_transformer = ColumnTransformer(transformers, remainder='passthrough')

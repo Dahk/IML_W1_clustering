@@ -118,6 +118,41 @@ def run_pca_credita(c):
     plt.show()
 
 
+@cli.command('knee')
+@click.option('-d', default='kropt', help='Dataset name kropt | satimage | credita')
+@click.option('-k', default=2, help='Maximum value of k to try [0, k]')
+def run_knee(d, k):
+    if d == 'kropt':
+        run_knee_kropt(k)
+
+    elif d == 'satimage':
+        run_knee_satimage(k)
+
+    elif d == 'credita':
+        run_knee_credita(k)
+
+    else:
+        raise ValueError('Unknown dataset {}'.format(d))
+
+
+def run_knee_kropt(k):
+    X, y = datasets.load_kropt()
+
+
+def run_knee_satimage(k):
+    X, y = datasets.load_satimage()
+
+
+def run_knee_credita(k):
+    X, y = datasets.load_credita()
+
+
+
+
+
+
+
+
 if __name__ == "__main__":
     cli()
 

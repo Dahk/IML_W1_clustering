@@ -42,12 +42,10 @@ class KMeans:
 
             if best == [] or self.inertia_ < best[0]:
                 # save best results
-                best = (
-                    self.inertia_,
-                    self.n_iter_,
-                    self.labels_.copy(),
-                    self.centroids_.copy(),
-                    )
+                best = (self.inertia_,
+                        self.n_iter_,
+                        self.labels_.copy(),
+                        self.centroids_.copy())
 
         # restore best results
         (self.inertia_,
@@ -305,13 +303,11 @@ class FuzzyCMeans:
 
             if best == [] or self.perfindex_ < best[0]:
                 # save best results
-                best = (
-                    self.perfindex_,
-                    self.n_iter_,
-                    self.labels_.copy(),
-                    self.U_.copy(),
-                    self.V_.copy(),
-                    )
+                best = (self.perfindex_,
+                        self.n_iter_,
+                        self.labels_.copy(),
+                        self.U_.copy(),
+                        self.V_.copy())
 
         # restore best results
         (self.perfindex_,
