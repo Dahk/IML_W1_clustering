@@ -117,15 +117,21 @@ def max_accuracy2(y_true, y_pred):
     return best_labelling
 
 def max_accuracy(c1, c2):
+    #c1: numpy array with label of cluster
+    #c2: numpy array with label of true cluster
+    
+    c1 = c1.astype(str)
+    c2 = c2.astype(str)
     match_satimage = pd.DataFrame({"Guess": c1, "True": c2})
 
-    match_satimage['match'] = match_satimage['Guess'] + '-T' + match_satimage['True']
+    match_satimage['match'] = match_satimage['Guess'] + '-t' + match_satimage['True']
     comparison = pd.DataFrame(match_satimage['match'])
 
     A = comparison.value_counts()
 
     sum = 0
     clusters = []
+    c1new = np.copy(c1).astype(int)
     j = 0
     for i in range(len(A)):
         C_str = A[[i]].index.values[0][0]
@@ -134,6 +140,7 @@ def max_accuracy(c1, c2):
         if CTL[0] in clusters or CTL[1] in clusters:
             pass
         else:
+            c1new[c1 == CTL[0]] = CTL[1][1:]
             clusters.append(CTL[0])
             clusters.append(CTL[1])
             sum = sum + int(A[[i]])
@@ -143,7 +150,7 @@ def max_accuracy(c1, c2):
 
     accuracy = sum/len(c1)
 
-    return accuracy
+    return accuracy, c1new.astype(int)
 
 
 def print_binary_metrics(results):
