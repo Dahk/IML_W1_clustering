@@ -191,18 +191,27 @@ class KMeans:
 
 class BisectingKMeans:
 
-    def __init__(self, k, tol=1e-7, max_iter=100, n_init=10, random_state=None):
+    def __init__(self, k, tol=1e-7, max_iter=100, n_init=10, 
+                 criterion='heterogeneity', random_state=None):
         self.k = k
         self.tol = tol
         self.max_iter = max_iter
         self.n_init = n_init
         self.random_state = random_state
 
+        if criterion == 'heterogeneity':
+            self.eval_func = lambda x: sse_l2(x, x.mean())
+        elif criterion == 'size':
+            self.eval_func = len
+        else:
+            raise ValueError('Unknown criterion {}. Possible values'
+                        ':\'heterogeneity\', \'size\''.format(criterion))
+
     def fit(self, X):
         X = _sanitize(X)
 
         labels = np.zeros(X.shape[0], dtype=np.int)
-        clusters = [(sse_l2(X, X.mean()), 0)]
+        clusters = [(self.eval_func(X), 0)]
 
         for i in range(1, self.k):
             target_label = self._pick(clusters)
@@ -218,23 +227,28 @@ class BisectingKMeans:
 
             self._insert(target_label, i, clusters, labels, X)
 
+        inertia = 0
+        for i in range(self.k):
+            cluster = X[labels == i]
+            inertia += sse_l2(cluster, cluster.mean())
+
         self.labels_ = labels
-        self.inertia_ = sum(c[0] for c in clusters)
+        self.inertia_ = inertia
         return self
 
     def fit_predict(self, X):
         return self.fit(X).labels_
 
     def _insert(self, label_a, label_b, clusters, labels, X):
-        # calculate SSE
+        # compute score according to criterion
         cluster_a = X[labels == label_a]
         cluster_b = X[labels == label_b]
-        sse_0 = sse_l2(cluster_a, cluster_a.mean())
-        sse_1 = sse_l2(cluster_b, cluster_b.mean())
+        score_a = self.eval_func(cluster_a)
+        score_b = self.eval_func(cluster_b)
 
         # add to list
-        clusters.append((sse_0, label_a))
-        clusters.append((sse_1, label_b))
+        clusters.append((score_a, label_a))
+        clusters.append((score_b, label_b))
 
     def _pick(self, clusters):
         # pick and remove the cluster with less cohesion (highest SSE)
