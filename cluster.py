@@ -7,6 +7,33 @@ from sklearn.cluster import KMeans as kmeans
 def sse_l2(x, y):
     return np.sum((x - y) ** 2)
 
+def wss(X, labels, centroids):
+    """
+    Calculate the WSS or cohesion, which is the within SSE
+    of distances from each sample to its centroid
+    """
+    k = centroids.shape[0]
+    wss = 0
+    for i in range(k):
+        cluster = X[labels == i]
+        centroid = centroids[i]
+        wss += sse_l2(cluster, centroid)
+
+    return wss
+
+def bss(X, labels, centroids):
+    """
+    Calculate the BSS or separation, which is the weighted SSE 
+    between each cluster centroid and the global centroid
+    """
+    k = centroids.shape[0]
+    global_mean = X.mean(axis=0)
+    cluster_sizes = np.array([len(X[labels == i]) for i in range(k)])
+
+    dists = np.sum((centroids - global_mean) ** 2, axis=1)
+    bss = np.sum(dists * cluster_sizes)
+    return bss
+
 
 def _sanitize(X):
     return X.values if isinstance(X, pd.DataFrame) else X
@@ -28,30 +55,20 @@ class KMeans:
     def fit(self, X):
         """
         Run the algorithm n_init times and keep
-        the one with best inertia
+        the one with best cohesion
         """
-        if self.centroids_ is not None:
-            centroids_init = self.centroids_.copy()
-        else:
-            centroids_init = None
-
-        best = []
+        results = []
         for _ in range(self.n_init):
-            self.centroids_ = centroids_init
-            self._fit(X)
+            res = self._fit(X)
+            results.append(res)
 
-            if best == [] or self.inertia_ < best[0]:
-                # save best results
-                best = (self.inertia_,
-                        self.n_iter_,
-                        self.labels_.copy(),
-                        self.centroids_.copy())
-
-        # restore best results
-        (self.inertia_,
+        # evaluate results, keep the best
+        best_result = self.eval_clusterings(results)
+        (self.labels_,
+         self.centroids_,
          self.n_iter_,
-         self.labels_,
-         self.centroids_) = best
+         self.cohesion_,
+         self.separation_) = best_result
         return self
 
 
@@ -100,12 +117,11 @@ class KMeans:
             variance_diff = variances - variances_old
 
             curr_iter += 1
+        
+        cohesion = wss(X, labels, centroids)
+        separation = bss(X, labels, centroids)
 
-        self.centroids_ = centroids
-        self.labels_ = labels
-        self.inertia_ = self._inertia(X, labels, centroids)
-        self.n_iter_ = curr_iter
-        return self
+        return labels, centroids, curr_iter, cohesion, separation
 
     def fit_predict(self, X):
         return self.fit(X).labels_
@@ -175,18 +191,29 @@ class KMeans:
 
             counts = np.array([np.count_nonzero(labels == i) for i in range(self.k)])
 
-    def _inertia(self, X, labels, centroids):
+    def eval_clusterings(self, clusterings):
         """
-        Calculate the inertia, which is the global SSE
-        of distances from each sample to its centroid
+        Custom criterion to evaluate clusterings and select the best
         """
-        inertia = 0
-        for i in range(self.k):
-            cluster = X[labels == i]
-            centroid = centroids[i]
-            inertia += sse_l2(cluster, centroid)
+        sse = np.array([[c[3], c[4]] for c in clusterings])
 
-        return inertia
+        intra_min = np.percentile(sse[:, 0], 10)
+        intra_max = np.percentile(sse[:, 0], 90)
+        intra_slope = 1 / (intra_min - intra_max)
+        intra_b = -intra_max*intra_slope
+
+        inter_min = np.percentile(sse[:, 1], 10)
+        inter_max = np.percentile(sse[:, 1], 90)
+        inter_slope = 1 / (inter_max - inter_min)
+        inter_b = -inter_min*inter_slope
+
+        intra_score = np.vectorize(lambda x: 0.75*(intra_slope*x + intra_b) if x > intra_min else 0.75*1)
+        inter_score = np.vectorize(lambda x: 0.25*(inter_slope*x + inter_b) if x < inter_max else 0.25*1)
+
+        sse = intra_score(sse[:, 0].clip(min=0)) + inter_score(sse[:, 1].clip(min=0))
+        best_clustering = clusterings[np.argmax(sse)]
+
+        return best_clustering
 
 
 class BisectingKMeans:
@@ -205,14 +232,13 @@ class BisectingKMeans:
             self.eval_func = len
         else:
             raise ValueError('Unknown criterion {}. Possible values'
-                        ':\'heterogeneity\', \'size\''.format(criterion))
+                        ': \'heterogeneity\', \'size\''.format(criterion))
 
     def fit(self, X):
         X = _sanitize(X)
 
         labels = np.zeros(X.shape[0], dtype=np.int)
         clusters = [(self.eval_func(X), 0)]
-
         for i in range(1, self.k):
             target_label = self._pick(clusters)
             cluster_mask = labels == target_label
@@ -227,13 +253,11 @@ class BisectingKMeans:
 
             self._insert(target_label, i, clusters, labels, X)
 
-        inertia = 0
-        for i in range(self.k):
-            cluster = X[labels == i]
-            inertia += sse_l2(cluster, cluster.mean())
+        centroids = np.array([X[labels == i].mean(axis=0) for i in range(self.k)])
 
         self.labels_ = labels
-        self.inertia_ = inertia
+        self.cohesion_ = wss(X, labels, centroids)
+        self.separation_ = bss(X, labels, centroids)
         return self
 
     def fit_predict(self, X):
@@ -251,7 +275,7 @@ class BisectingKMeans:
         clusters.append((score_b, label_b))
 
     def _pick(self, clusters):
-        # pick and remove the cluster with less cohesion (highest SSE)
+        # pick and remove the cluster with the highest value
         i = np.argmax([c[0] for c in clusters])
         return clusters.pop(i)[1]
 
@@ -303,32 +327,20 @@ class FuzzyCMeans:
     def fit(self, X):
         """
         Run the algorithm n_iter times and keep
-        the one with best inertia
+        the one with best cohesion
         """
-        if self.V_ is not None:
-            V_init = self.V_.copy()
-        else:
-            V_init = None
-
-        best = []
+        results = []
         for _ in range(self.n_init):
-            self.V_ = V_init
-            self._fit(X)
+            res = self._fit(X)
+            results.append(res)
 
-            if best == [] or self.perfindex_ < best[0]:
-                # save best results
-                best = (self.perfindex_,
-                        self.n_iter_,
-                        self.labels_.copy(),
-                        self.U_.copy(),
-                        self.V_.copy())
-
-        # restore best results
-        (self.perfindex_,
-         self.n_iter_,
-         self.labels_,
+        # evaluate results, keep the best
+        best_i = np.argmin([res[4] for res in results])
+        (self.labels_,
          self.U_,
-         self.V_) = best
+         self.V_,
+         self.n_iter_,
+         self.perfindex_) = results[best_i]
         return self
 
     def _fit(self, X):
@@ -363,12 +375,10 @@ class FuzzyCMeans:
             V_diff = np.linalg.norm(V - V_old, 2, axis=1)
             curr_iter += 1
 
-        self.U_ = U
-        self.V_ = V
-        self.labels_ = np.argmax(U, axis=0)
-        self.perfindex_ = self._performance_index(X, U, V)
-        self.n_iter_ = curr_iter
-        return self
+        labels = np.argmax(U, axis=0)
+        perfindex = self._performance_index(X, U, V)
+
+        return labels, U, V, curr_iter, perfindex
 
     def fit_predict(self, X):
         return self.fit(X).labels_
