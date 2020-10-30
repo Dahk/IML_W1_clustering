@@ -6,7 +6,6 @@ import itertools
 
 def best_accuracy(y_true, y_pred, max_iter=1e4):
     score1, _ = best_permutation(y_true, y_pred, max_iter=max_iter)
-                              
     score2 = max_accuracy(y_true, y_pred)
 
     return score1 if score1 > score2 else score2
@@ -19,9 +18,7 @@ def best_labelling(y_true, y_pred, max_iter=1e4):
     that matches labels in order from best correspondance
     """
     score1, perm1 = best_permutation(y_true, y_pred, max_iter=max_iter)
-                              
-    perm2 = max_accuracy2(y_true, y_pred)
-    score2 = metrics.accuracy_score(y_true, perm2)
+    score2, perm2 = max_accuracy(y_true, y_pred)
 
     return perm1 if score1 > score2 else perm2
 
@@ -115,6 +112,7 @@ def max_accuracy2(y_true, y_pred):
         best_labelling[y_pred == label] = new_label
     
     return best_labelling
+
 
 def max_accuracy(c1, c2):
     #c1: numpy array with label of cluster
