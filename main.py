@@ -1,16 +1,12 @@
 import sys
 import click
 import numpy as np
+from matplotlib import pyplot as plt
 
 from sklearn import metrics
 from sklearn.cluster import DBSCAN
 from sklearn.decomposition import PCA
-from sklearn.metrics import accuracy_score
 from sklearn.neighbors import NearestNeighbors
-from sklearn.cluster import KMeans as sk_KMeans
-from sklearn.metrics.cluster import contingency_matrix
-
-from matplotlib import pyplot as plt
 
 import datasets
 from cluster import KMeans
@@ -18,7 +14,14 @@ from cluster import KMeanspp
 from cluster import BisectingKMeans
 from cluster import FuzzyCMeans
 from evaluation import (print_binary_metrics,
-                        print_multi_metrics)
+                        print_multi_metrics,
+                        plot_clusters)
+
+
+RS_CREDITA_KMEANS = 21320
+RS_CREDITA_BIKMEANS = 21320
+RS_CREDITA_KMEANSPP = 90184
+RS_CREDITA_FUZZYCMEANS = 80723
 
 
 @click.group()
@@ -26,6 +29,8 @@ def cli():
     pass
 
 
+# -----------------------------------------------------------------------------------------
+# Run all agorithms and plot/print metrics
 @cli.command('run')
 @click.option('-d', default='kropt', help='Dataset name kropt | satimage | credita')
 def run(d):
@@ -55,33 +60,38 @@ def run_credita():
     results = []
 
     # KMeans
-    kmeans = KMeans(k=2)
+    kmeans = KMeans(k=2, random_state=RS_CREDITA_KMEANS)
     y_pred = kmeans.fit_predict(X)
     results.append(('KMeans', y, y_pred))
 
     # BisectingKMeans
-    bikmeans = BisectingKMeans(k=2)
+    bikmeans = BisectingKMeans(k=2, random_state=RS_CREDITA_BIKMEANS)
     y_pred = bikmeans.fit_predict(X)
     results.append(('BiKMeans', y, y_pred))
 
     # KMeanspp
-    kmeanspp = KMeanspp(k=2)
+    kmeanspp = KMeanspp(k=2, random_state=RS_CREDITA_KMEANSPP)
     y_pred = kmeanspp.fit_predict(X)
     results.append(('KMeanspp', y, y_pred))
 
     # FuzzyCMeans
-    fuzzycmeans = FuzzyCMeans(c=2, m=2, random_state=35)
+    fuzzycmeans = FuzzyCMeans(c=2, m=2, random_state=RS_CREDITA_FUZZYCMEANS)
     y_pred = fuzzycmeans.fit_predict(X)
     results.append(('FuzzyCMeans', y, y_pred))
 
     # DBSCAN
-    dbscan = DBSCAN(eps=1.751004016064257, min_samples=216)
+    #dbscan = DBSCAN(eps=1.751004016064257, min_samples=216)
+    dbscan = DBSCAN(eps=1.75, min_samples=10)
     y_pred = dbscan.fit_predict(X)
+    y_pred[y_pred == -1] = 1
     results.append(('DBSCAN', y, y_pred))
-
+    
     print_binary_metrics(results)
+    plot_clusters(results)
 
 
+# -----------------------------------------------------------------------------------------
+# PCA
 @cli.command('pca')
 @click.option('-d', default='kropt', help='Dataset name kropt | satimage | credita')
 @click.option('-c', default=2, help='# components to reduce to')
@@ -117,40 +127,122 @@ def run_pca_credita(c):
         plt.scatter(*[X[y == i, j] for j in range(c)], color='C'+str(i))
     plt.show()
 
-
-@cli.command('knee')
+# -----------------------------------------------------------------------------------------
+# DBSCAN - Nearest Neighbours knee  
+@cli.command('nn-knee')
 @click.option('-d', default='kropt', help='Dataset name kropt | satimage | credita')
-@click.option('-k', default=2, help='Maximum value of k to try [0, k]')
-def run_knee(d, k):
+def run_nn_knee(d):
     if d == 'kropt':
-        run_knee_kropt(k)
+        run_nn_knee_kropt()
 
     elif d == 'satimage':
-        run_knee_satimage(k)
+        run_nn_knee_satimage()
 
     elif d == 'credita':
-        run_knee_credita(k)
+        run_nn_knee_credita()
 
     else:
         raise ValueError('Unknown dataset {}'.format(d))
 
 
-def run_knee_kropt(k):
+def run_nn_knee_kropt():
     X, y = datasets.load_kropt()
 
 
-def run_knee_satimage(k):
+def run_nn_knee_satimage():
     X, y = datasets.load_satimage()
 
 
-def run_knee_credita(k):
+def run_nn_knee_credita():
     X, y = datasets.load_credita()
 
+    fig, ax = plt.subplots(4, 4, figsize=(20, 24))
+    ax = ax.flat
+
+    for i, minpts in enumerate(np.linspace(5, 80, 16, dtype='int64')):
+        nbrs = NearestNeighbors(n_neighbors=minpts).fit(X)
+        distances, indices = nbrs.kneighbors(X)
+        sorted_dists = np.sort(distances[:, -1])
+
+        ax[i].plot(range(X.shape[0]), sorted_dists)
+        ax[i].title.set_text(f'nn={minpts}')
+        ax[i].set_ylabel('distance')
+        ax[i].set_xlabel('ordered samples')
+        ax[i].yaxis.grid(color='0.85')
+        ax[i].set_axisbelow(True)
+        
+    plt.subplots_adjust(wspace=0.3, hspace=0.55)
+    plt.show()
+    
+
+# -----------------------------------------------------------------------------------------
+# KMeans - K clusters knee
+@cli.command('km-knee')
+@click.option('-d', default='kropt', help='Dataset name kropt | satimage | credita')
+@click.option('-k', default=10, help='Maximum value of k to try [1, k]')
+def run_km_knee(d, k):
+    if d == 'kropt':
+        run_km_knee_kropt(k)
+
+    elif d == 'satimage':
+        run_km_knee_satimage(k)
+
+    elif d == 'credita':
+        run_km_knee_credita(k)
+
+    else:
+        raise ValueError('Unknown dataset {}'.format(d))
 
 
+def run_km_knee_kropt(k):
+    X, y = datasets.load_kropt()
+
+    cohesion = []
+    for _ in range(1, k):
+        kmeans = KMeanspp(k=k, n_init=50).fit(X)
+        cohesion.append(kmeans.cohesion_)
+    
+    plt.plot(range(k - 1), cohesion)
+    plt.title('Cluster cohesion with respect to k\nKmeanspp / Kropt')
+    plt.xlabel('k')
+    plt.ylabel('Cohesion value')
+    plt.axes().yaxis.grid(color='0.85')
+    plt.axes().set_axisbelow(True)
+    plt.show()
 
 
+def run_km_knee_satimage(k):
+    X, y = datasets.load_satimage()
 
+    cohesion = []
+    for _ in range(1, k):
+        kmeans = KMeanspp(k=k, n_init=10).fit(X)
+        cohesion.append(kmeans.cohesion_)
+    
+    plt.plot(range(k - 1), cohesion)
+    plt.title('Cluster cohesion with respect to k\nKmeanspp / SatImage')
+    plt.xlabel('k')
+    plt.ylabel('Cohesion value')
+    plt.axes().yaxis.grid(color='0.85')
+    plt.axes().set_axisbelow(True)
+    plt.show()
+
+
+def run_km_knee_credita(k):
+    X, y = datasets.load_credita()
+
+    cohesion = []
+    for _ in range(1, k):
+        kmeans = KMeanspp(k=k, n_init=50).fit(X)
+        cohesion.append(kmeans.cohesion_)
+    
+    plt.plot(range(k - 1), cohesion)
+    plt.title('Cluster cohesion with respect to k\nKmeanspp / Credit-A')
+    plt.xlabel('k')
+    plt.ylabel('Cohesion value')
+    plt.axes().yaxis.grid(color='0.85')
+    plt.axes().set_axisbelow(True)
+    plt.show()
 
 
 if __name__ == "__main__":

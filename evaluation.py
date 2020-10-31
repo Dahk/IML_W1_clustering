@@ -1,7 +1,8 @@
+import itertools
 import numpy as np
 import pandas as pd
 from sklearn import metrics
-import itertools
+from matplotlib import pyplot as plt
 
 
 def best_accuracy(y_true, y_pred, max_iter=1e4):
@@ -18,7 +19,10 @@ def best_labelling(y_true, y_pred, max_iter=1e4):
     that matches labels in order from best correspondance
     """
     score1, perm1 = best_permutation(y_true, y_pred, max_iter=max_iter)
-    score2, perm2 = max_accuracy(y_true, y_pred)
+    #score2, perm2 = max_accuracy(y_true, y_pred)
+
+    perm2 = max_accuracy2(y_true, y_pred)
+    score2 = metrics.accuracy_score(y_true, y_pred)
 
     return perm1 if score1 > score2 else perm2
 
@@ -172,10 +176,28 @@ def print_binary_metrics(results):
         row = '\t\t'.join(scores + [name])
         print(row)
 
-        # confusion_matrix
-        # confusion_matrix = metrics.confusion_matrix(y_true, y_pred)
-        # print('Confusion matrix:\n', confusion_matrix)
-
 
 def print_multi_metrics(y_true, y_pred):
     pass
+
+
+def plot_clusters(results, figsize=(9, 8)):
+    results.append(('Ground truth', results[0][1], results[0][1]))
+
+    fig, ax = plt.subplots(2, 3, figsize=figsize)
+    fig.suptitle('Cluster size')
+
+    ax = ax.flat
+    for i, (name, y_true, y_pred) in enumerate(results):
+        x, y = np.unique(y_pred, return_counts=True)
+        
+        ax[i].bar(x, y, label='count')
+        ax[i].title.set_text(name)
+        ax[i].set_xlabel('Clusters')
+        ax[i].set_ylabel('Number of instances')
+
+        ax[i].yaxis.grid(color='0.85')
+        ax[i].set_axisbelow(True)
+
+    plt.subplots_adjust(wspace=0.4, hspace=0.35)
+    plt.show()
