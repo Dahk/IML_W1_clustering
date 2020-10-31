@@ -12,9 +12,17 @@ Run PCA on a dataset:
 python3 main.py pca -d DATASET_NAME -c N_COMPONENTS
 ```
 
-Where:
-- DATASET_NAME = kropt | satimage | kropt
-- N_COMPONENTS = # components to reduce to
+Run NearestNeighbors and order by distance:
+```bash
+python3 main.py nn-knee -d DATASET_NAME -n N_NEIGHBORS
+```
+
+
+Run KMeans with different cluster sizes [0, k] on a dataset:
+```bash
+python3 main.py km-knee -d DATASET_NAME -k UP_TO_K
+```
+
 
 
 \

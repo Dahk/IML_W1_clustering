@@ -131,47 +131,66 @@ def run_pca_credita(c):
 # DBSCAN - Nearest Neighbours knee  
 @cli.command('nn-knee')
 @click.option('-d', default='kropt', help='Dataset name kropt | satimage | credita')
-def run_nn_knee(d):
+@click.option('-n', default=10, help='n nearest neighbors')
+def run_nn_knee(d, n):
     if d == 'kropt':
-        run_nn_knee_kropt()
+        run_nn_knee_kropt(n)
 
     elif d == 'satimage':
-        run_nn_knee_satimage()
+        run_nn_knee_satimage(n)
 
     elif d == 'credita':
-        run_nn_knee_credita()
+        run_nn_knee_credita(n)
 
     else:
         raise ValueError('Unknown dataset {}'.format(d))
 
 
-def run_nn_knee_kropt():
+def run_nn_knee_kropt(n):
     X, y = datasets.load_kropt()
 
+    nbrs = NearestNeighbors(n_neighbors=n).fit(X)
+    distances, indices = nbrs.kneighbors(X)
+    sorted_dists = np.sort(distances[:, -1])
 
-def run_nn_knee_satimage():
+    plt.plot(range(X.shape[0]), sorted_dists)
+    plt.title(f'Distance to n={n} nearest neighbor')
+    plt.ylabel('Distance')
+    plt.xlabel('Ordered instances')
+    plt.axes().yaxis.grid(color='0.85')
+    plt.axes().set_axisbelow(True)
+    plt.show()
+
+
+def run_nn_knee_satimage(n):
     X, y = datasets.load_satimage()
 
+    nbrs = NearestNeighbors(n_neighbors=n).fit(X)
+    distances, indices = nbrs.kneighbors(X)
+    sorted_dists = np.sort(distances[:, -1])
 
-def run_nn_knee_credita():
+    plt.plot(range(X.shape[0]), sorted_dists)
+    plt.title(f'Distance to n={n} nearest neighbor')
+    plt.ylabel('Distance')
+    plt.xlabel('Ordered instances')
+    plt.axes().yaxis.grid(color='0.85')
+    plt.axes().set_axisbelow(True)
+    plt.show()
+
+
+def run_nn_knee_credita(n):
     X, y = datasets.load_credita()
 
-    fig, ax = plt.subplots(4, 4, figsize=(20, 24))
-    ax = ax.flat
+    nbrs = NearestNeighbors(n_neighbors=n).fit(X)
+    distances, indices = nbrs.kneighbors(X)
+    sorted_dists = np.sort(distances[:, -1])
 
-    for i, minpts in enumerate(np.linspace(5, 80, 16, dtype='int64')):
-        nbrs = NearestNeighbors(n_neighbors=minpts).fit(X)
-        distances, indices = nbrs.kneighbors(X)
-        sorted_dists = np.sort(distances[:, -1])
-
-        ax[i].plot(range(X.shape[0]), sorted_dists)
-        ax[i].title.set_text(f'nn={minpts}')
-        ax[i].set_ylabel('distance')
-        ax[i].set_xlabel('ordered samples')
-        ax[i].yaxis.grid(color='0.85')
-        ax[i].set_axisbelow(True)
-        
-    plt.subplots_adjust(wspace=0.3, hspace=0.55)
+    plt.plot(range(X.shape[0]), sorted_dists)
+    plt.title(f'Distance to n={n} nearest neighbor')
+    plt.ylabel('Distance')
+    plt.xlabel('Ordered instances')
+    plt.axes().yaxis.grid(color='0.85')
+    plt.axes().set_axisbelow(True)
     plt.show()
     
 
@@ -199,7 +218,7 @@ def run_km_knee_kropt(k):
 
     cohesion = []
     for _ in range(1, k):
-        kmeans = KMeanspp(k=k, n_init=50).fit(X)
+        kmeans = KMeanspp(k=k, n_init=10).fit(X)
         cohesion.append(kmeans.cohesion_)
     
     plt.plot(range(k - 1), cohesion)
