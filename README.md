@@ -18,7 +18,7 @@ python3 main.py nn-knee -d DATASET_NAME -n N_NEIGHBORS
 ```
 
 
-Run KMeans with different cluster sizes [0, k] on a dataset:
+Run KMeans with different cluster sizes [1, k] on a dataset:
 ```bash
 python3 main.py km-knee -d DATASET_NAME -k UP_TO_K
 ```

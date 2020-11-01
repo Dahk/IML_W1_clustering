@@ -5,26 +5,17 @@ from sklearn import metrics
 from matplotlib import pyplot as plt
 
 
-def best_accuracy(y_true, y_pred, max_iter=1e4):
-    score1, _ = best_permutation(y_true, y_pred, max_iter=max_iter)
-    score2 = max_accuracy(y_true, y_pred)
-
-    return score1 if score1 > score2 else score2
-
-
 def best_labelling(y_true, y_pred, max_iter=1e4):
     """
     Return the best labelling in terms of accuracy as a result
     of attempting max_iter permutations (brute force) and a search
-    that matches labels in order from best correspondance
+    that matches labels in order from best correspondance/accuracy
     """
     score1, perm1 = best_permutation(y_true, y_pred, max_iter=max_iter)
-    #score2, perm2 = max_accuracy(y_true, y_pred)
-
-    perm2 = max_accuracy2(y_true, y_pred)
-    score2 = metrics.accuracy_score(y_true, y_pred)
+    score2, perm2 = max_accuracy(y_pred, y_true)
 
     return perm1 if score1 > score2 else perm2
+
 
 def best_permutation(y_true, y_pred, score_func=metrics.accuracy_score, greatest=True, 
                      use_pred_labels=False, max_iter=1e4):
@@ -85,43 +76,19 @@ def best_permutation(y_true, y_pred, score_func=metrics.accuracy_score, greatest
     return best_score, best_perm
 
 
-def max_accuracy2(y_true, y_pred):
+def max_accuracy(c1, c2):
     """
     Relabel the predicted labels *in order* to 
-    achieve the best labelling
-    """
-    pairs = []
-    unmatched_pred_labels = np.unique(y_pred).tolist()
-    unmatched_true_labels = np.unique(y_true).tolist()
+    achieve the best accuracy, and return that
+    score and the best labelling
 
-    for _ in range(len(unmatched_pred_labels)):
-        best_match_count = -1
-        best_match = (0, 0)
-        for pred_label in unmatched_pred_labels:
-            for true_label in unmatched_true_labels:
-                test_cluster = np.full_like(y_pred, -1)
-                test_cluster[y_pred == pred_label] = true_label
-
-                match_count = np.count_nonzero(test_cluster == y_true)
-                if match_count > best_match_count:
-                    best_match_count = match_count
-                    best_match = (pred_label, true_label)
-        
-        unmatched_pred_labels.remove(best_match[0])
-        unmatched_true_labels.remove(best_match[1])
-        pairs.append(best_match)
-
-    best_labelling = np.zeros_like(y_pred)
-    for label, new_label in pairs:
-        best_labelling[y_pred == label] = new_label
-    
-    return best_labelling
-
-
-def max_accuracy(c1, c2):
-    #c1: numpy array with label of cluster
-    #c2: numpy array with label of true cluster
-    
+    Parameters
+    ----------
+    c1 : np.array
+        numpy array with label of predicted cluster
+    c2 : np.array
+        numpy array with label of true cluster
+    """    
     c1 = c1.astype(str)
     c2 = c2.astype(str)
     match_satimage = pd.DataFrame({"Guess": c1, "True": c2})
