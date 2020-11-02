@@ -120,7 +120,7 @@ class KMeans:
         
         cohesion = wss(X, labels, centroids)
         separation = bss(X, labels, centroids)
-
+        
         return labels, centroids, curr_iter, cohesion, separation
 
     def fit_predict(self, X):
@@ -306,8 +306,12 @@ class KMeanspp(KMeans):
                 centroids[i] = X[farthest_point_i]
 
             self.centroids_ = centroids
+            res = super()._fit(X)
+            self.centroids_ = None  # reset attribute since it is set by self.fit
+            return res
 
-        return super()._fit(X)
+        else:
+            return super()._fit(X)
 
 
 class FuzzyCMeans:
